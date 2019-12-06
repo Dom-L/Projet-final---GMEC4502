@@ -1,0 +1,219 @@
+import cv2
+import numpy as np
+import anki_vector
+from anki_vector.util import degrees, distance_mm, speed_mmps
+#Fait le robot bouger à une endroit précise
+color = 0
+args = anki_vector.util.parse_command_args()
+with anki_vector.Robot(args.serial) as robot:
+    robot.behavior.drive_off_charger()
+    robot.behavior.drive_straight(distance_mm(270),speed_mmps(75))
+    robot.behavior.drive_straight(distance_mm(300), speed_mmps(75))
+    robot.behavior.set_head_angle(degrees(10.0))
+    robot.behavior.set_lift_height(0.0)
+#La prochaine partie du code fait le robot prende une photo pour ensuite lui appliquer un mask et detérminer la
+# couleur du cube. Les Valeur HSV son déterminé à l'avance. La couleur du cube change la variable couleur a 1
+# pour une couleur rouge et 2 si la couleur est bleu.
+    robot.camera.init_camera_feed()
+    #Capture d'image
+
+    img = cv2.cvtColor(np.array(robot.camera.latest_image.raw_image), cv2.COLOR_RGB2BGR)
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+    lower_red = np.array([0, 106, 0])
+    upper_red = np.array([15, 255, 255])
+    Lower_blue = np.array([90, 123, 37])
+    upper_blue = np.array([125, 255, 255])
+    Red = cv2.inRange(hsv, lower_red, upper_red)
+    Blue = cv2.inRange(hsv, Lower_blue, upper_blue)
+    #Création du mask pour filtrer les couleurs
+
+    Tresh1 = cv2.bitwise_and(img, img, mask=Red)
+    Tresh2 = cv2.bitwise_and(img, img, mask=Blue)
+    #Trouver les contours des objects
+
+    Red_contours, _ = cv2.findContours(Red, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    Blue_contours, _ = cv2.findContours(Blue, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+
+    for contour in Red_contours:
+        area = cv2.contourArea(contour)
+
+        if area > 1000:
+            robot.behavior.say_text('Wow a red cube')
+            color = 1
+
+    for contour in Blue_contours:
+        area = cv2.contourArea(contour)
+
+        if area > 1000:
+            robot.behavior.say_text('Wow a Blue cube')
+            color = 2
+#Cette partie mesure la distance du cube afin de pouvoir faire la cueillette
+
+    distance = robot.proximity.last_sensor_reading.distance
+    robot.behavior.say_text(str(distance.distance_mm) + " millimeters or " + str(
+        "%.2f" % distance.distance_inches) + "inches")
+    robot.behavior.say_text('retrieving the cube')
+    robot.behavior.drive_straight(distance, speed_mmps(50))
+    robot.behavior.set_lift_height(1)
+    robot.behavior.turn_in_place(degrees(180))
+    robot.behavior.drive_straight(distance, speed_mmps(50))
+    robot.behavior.drive_straight(distance_mm(300), speed_mmps(50))
+
+#Détermination du dépot du cube selon la variable color
+    if color==1:
+
+        robot.behavior.drive_straight(distance_mm(200), speed_mmps(50))
+        robot.behavior.turn_in_place(degrees(90))
+        robot.behavior.set_lift_height(0)
+        robot.behavior.turn_in_place(degrees(90))
+        robot.behavior.drive_straight(distance_mm(200), speed_mmps(50))
+
+    if color==2:
+        robot.behavior.drive_straight(distance_mm(70), speed_mmps(50))
+        robot.behavior.turn_in_place(degrees(90))
+        robot.behavior.set_lift_height(0)
+        robot.behavior.turn_in_place(degrees(90))
+        robot.behavior.drive_straight(distance_mm(70), speed_mmps(50))
+
+    #Apres avoir eu déposé le cube, le robot répete le code en vérifiant la position deux et trois
+
+    color=0
+    robot.behavior.drive_straight(distance_mm(200), speed_mmps(50))
+    robot.behavior.turn_in_place(degrees(-90))
+    robot.camera.init_camera_feed()
+    img = cv2.cvtColor(np.array(robot.camera.latest_image.raw_image), cv2.COLOR_RGB2BGR)
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+    lower_red = np.array([0, 106, 0])
+    upper_red = np.array([15, 255, 255])
+    Lower_blue = np.array([90, 123, 37])
+    upper_blue = np.array([125, 255, 255])
+    Red = cv2.inRange(hsv, lower_red, upper_red)
+    Blue = cv2.inRange(hsv, Lower_blue, upper_blue)
+
+    Tresh1 = cv2.bitwise_and(img, img, mask=Red)
+    Tresh2 = cv2.bitwise_and(img, img, mask=Blue)
+
+    Red_contours, _ = cv2.findContours(Red, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    Blue_contours, _ = cv2.findContours(Blue, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+
+    for contour in Red_contours:
+        area = cv2.contourArea(contour)
+
+        if area > 1000:
+            robot.behavior.say_text('Wow a red cube')
+            color = 1
+
+    for contour in Blue_contours:
+        area = cv2.contourArea(contour)
+
+        if area > 1000:
+            robot.behavior.say_text('Wow a Blue cube')
+            color = 2
+
+    distance = robot.proximity.last_sensor_reading.distance
+    robot.behavior.say_text(str(distance.distance_mm) + " millimeters or " + str(
+        "%.2f" % distance.distance_inches) + "inches")
+    robot.behavior.say_text('retrieving the cube')
+    robot.behavior.drive_straight(distance, speed_mmps(50))
+    robot.behavior.set_lift_height(1)
+    robot.behavior.turn_in_place(degrees(180))
+    robot.behavior.drive_straight(distance, speed_mmps(50))
+    robot.behavior.turn_in_place(degrees(90))
+    robot.behavior.drive_straight(distance_mm(200), speed_mmps(50))
+
+    if color==1:
+
+        robot.behavior.drive_straight(distance_mm(195), speed_mmps(50))
+        robot.behavior.turn_in_place(degrees(90))
+        robot.behavior.set_lift_height(0)
+        robot.behavior.turn_in_place(degrees(90))
+        robot.behavior.drive_straight(distance_mm(195), speed_mmps(50))
+
+    if color==2:
+        robot.behavior.drive_straight(distance_mm(70), speed_mmps(50))
+        robot.behavior.turn_in_place(degrees(90))
+        robot.behavior.set_lift_height(0)
+        robot.behavior.turn_in_place(degrees(90))
+        robot.behavior.drive_straight(distance_mm(70), speed_mmps(50))
+
+    color=0
+    robot.behavior.drive_straight(distance_mm(200), speed_mmps(50))
+    robot.behavior.turn_in_place(degrees(-90))
+    robot.camera.init_camera_feed()
+    img = cv2.cvtColor(np.array(robot.camera.latest_image.raw_image), cv2.COLOR_RGB2BGR)
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+    lower_red = np.array([0, 106, 0])
+    upper_red = np.array([15, 255, 255])
+    Lower_blue = np.array([90, 123, 30])
+    upper_blue = np.array([125, 255, 255])
+    Red = cv2.inRange(hsv, lower_red, upper_red)
+    Blue = cv2.inRange(hsv, Lower_blue, upper_blue)
+    Tresh1 = cv2.bitwise_and(img, img, mask=Red)
+    Tresh2 = cv2.bitwise_and(img, img, mask=Blue)
+
+    Red_contours, _ = cv2.findContours(Red, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    Blue_contours, _ = cv2.findContours(Blue, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+
+    for contour in Red_contours:
+        area = cv2.contourArea(contour)
+
+        if area > 1000:
+            robot.behavior.say_text('Wow a red cube')
+            color = 1
+
+    for contour in Blue_contours:
+        area = cv2.contourArea(contour)
+
+        if area > 1000:
+            robot.behavior.say_text('Wow a Blue cube')
+            color = 2
+
+    distance = robot.proximity.last_sensor_reading.distance
+    robot.behavior.say_text(str(distance.distance_mm) + " millimeters or " + str(
+        "%.2f" % distance.distance_inches) + "inches")
+    robot.behavior.say_text('retrieving the cube')
+    robot.behavior.drive_straight(distance, speed_mmps(50))
+    robot.behavior.set_lift_height(1)
+    robot.behavior.turn_in_place(degrees(180))
+    robot.behavior.drive_straight(distance, speed_mmps(50))
+    robot.behavior.turn_in_place(degrees(90))
+    robot.behavior.drive_straight(distance_mm(200), speed_mmps(50))
+
+    if color==1:
+
+        robot.behavior.drive_straight(distance_mm(195), speed_mmps(50))
+        robot.behavior.turn_in_place(degrees(90))
+        robot.behavior.set_lift_height(0)
+        robot.behavior.turn_in_place(degrees(90))
+        robot.behavior.drive_straight(distance_mm(195), speed_mmps(50))
+
+    if color==2:
+        robot.behavior.drive_straight(distance_mm(70), speed_mmps(50))
+        robot.behavior.turn_in_place(degrees(90))
+        robot.behavior.set_lift_height(0)
+        robot.behavior.turn_in_place(degrees(90))
+        robot.behavior.drive_straight(distance_mm(70), speed_mmps(50))
+#Avec les trois cubes, Vector a terminer sa tache et effectue une dance pour célébrer
+
+    robot.anim.play_animation('anim_dizzy_pickup_02')
+    robot.anim.play_animation('anim_dancebeat_pivot_right_01')
+    robot.anim.play_animation('anim_dancebeat_scoot_left_01')
+    robot.anim.play_animation('anim_dancebeat_pivot_right_01')
+    robot.anim.play_animation('anim_dancebeat_scoot_left_01')
+    robot.anim.play_animation('anim_dancebeat_pivot_right_01')
+    robot.anim.play_animation('anim_dancebeat_scoot_left_01')
+    robot.anim.play_animation('anim_dancebeat_pivot_right_01')
+    robot.anim.play_animation('anim_dancebeat_scoot_left_01')
+    robot.anim.play_animation('anim_dancebeat_pivot_right_01')
+    robot.anim.play_animation('anim_dancebeat_pivot_right_01')
+    robot.anim.play_animation('anim_dancebeat_scoot_left_01')
+    robot.anim.play_animation('anim_dancebeat_pivot_right_01')
+    robot.anim.play_animation('anim_dancebeat_scoot_left_01')
+    robot.anim.play_animation('anim_dancebeat_pivot_right_01')
+    robot.anim.play_animation('anim_dancebeat_scoot_left_01')
+    robot.anim.play_animation('anim_dancebeat_pivot_right_01')
+    robot.anim.play_animation('anim_dancebeat_scoot_left_01')
+    robot.anim.play_animation('anim_dancebeat_pivot_right_01')
